@@ -1,21 +1,23 @@
 import requests, random, os
-TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = "@promolarachadinhos"
+from urllib.parse import quote
+
+TOKEN = os.environ.get("BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or "@promolarachadinhos"
 LINK = "https://meli.la/2aXmCyr"
 
-temas = ["organizador cozinha", "kit potes hermeticos", "organizador banheiro"]
+temas = ["organizador cozinha", "air fryer", "escova secadora"]
+
 tema = random.choice(temas)
-r = requests.get(f"https://api.mercadolibre.com/sites/MLB/search?q={tema}&limit=20")
-prod = random.choice(r.json()['results'])
+url = f"https://api.mercadolibre.com/sites/MLB/search?q={quote(tema)}&limit=10"
+r = requests.get(url, timeout=10)
+dados = r.json()
 
-texto = f"""🔥 ACHADINHO DA LARA - {tema.upper()}!
+if 'results' not in dados or len(dados['results']) == 0:
+    print("Sem produto, saindo")
+    exit(0)
 
-{prod['title']}
+prod = random.choice(dados['results'])
 
-💰 R$ {prod['price']} com entrega FULL
+texto = f"🔥 ACHADINHO DA LARA - {tema}\n\n{prod['title']}\n\n💰 R$ {prod['price']}\n\n👉 MEU LINK: {LINK}\n\n#achados"
 
-👉 MEU LINK: {LINK}
-
-#achados #larachadinhos"""
-
-requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={"chat_id": CHAT_ID, "photo": prod['thumbnail'], "caption": texto})
+requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": texto})
