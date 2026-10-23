@@ -1,87 +1,56 @@
 import os
-import random
 import requests
-import asyncio
+import random
 from telegram import Bot
 
-TOKEN = os.environ.get("BOT_TOKEN") or os.getenv("BOT_TOKEN")
-CHANNEL = os.environ.get("CHANNEL_ID") or os.getenv("CHANNEL_ID")
-if not TOKEN or not CHANNEL:
-    raise SystemExit("Faltou BOT_TOKEN ou CHANNEL_ID")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+# SEU ID DE AFILIADO DO MERCADO LIVRE - TROCA AQUI
+SEU_CODIGO_AFILIADO = "malusilveira"  # << coloca seu código aqui
 
-temas = [
-    "organizador cozinha",
-    "air fryer",
-    "escova secadora",
-    "aspirador robo",
-    "liquidificador",
-    "kit potes hermeticos",
-    "cafeteira eletrica",
-    "jogo de toalhas",
-    "organizador banheiro",
-    "bolsa feminina transversal",
-    "tapete cozinha",
-    "cortina blackout"
-]
+bot = Bot(token=BOT_TOKEN)
 
-frases_titulo = [
-    "⚡ OFERTA IMPERDÍVEL - ACHADINHOS DO LAR ⚡",
-    "🏠 ACHADINHOS DO LAR QUE VOCÊ VAI AMAR 🔥",
-    "💥 ACHADINHOS DO LAR - PREÇO BAIXOU MUITO!",
-    "✨ O MAIS QUERIDO DO LAR ✨",
-    "🚨 PROMOÇÃO RELÂMPAGO - ACHADINHOS DO LAR 🚨",
-    "💣 ACHADINHOS DO LAR - QUEIMOU O ESTOQUE!"
-]
+# Busca produtos que estão bombando no Mercado Livre - Lar
+buscas = ["organizador de gaveta", "cesto organizador", "kit organizador cozinha", "organizador armário"]
+termo = random.choice(buscas)
 
-AFFILIATE_FALLBACK = "https://meli.la/2aXmCyr"
+url = f"https://api.mercadolibre.com/sites/MLB/search?q={termo}&limit=10&sort=price_asc"
+res = requests.get(url).json()
+produtos = res.get("results", [])
 
-def buscar_produto(tema):
-    try:
-        url = "https://api.mercadolibre.com/sites/MLB/search"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        params = {"q": tema, "limit": 15}
-        r = requests.get(url, params=params, headers=headers, timeout=15)
-        data = r.json()
-        results = data.get("results", [])
-        if not results:
-            return None
-        prod = random.choice(results[:8])
-        thumb = prod.get("thumbnail", "").replace("-I.jpg", "-O.jpg").replace("-I.webp", "-O.webp")
-        return {
-            "title": prod.get("title", "Achadinho incrível"),
-            "price": prod.get("price"),
-            "link": prod.get("permalink", AFFILIATE_FALLBACK),
-            "thumb": thumb
-        }
-    except Exception as e:
-        print(f"Erro: {e}")
-        return None
+# Pega o produto com melhor desconto
+produto = produtos[0]
 
-async def main():
-    tema = random.choice(temas)
-    frase = random.choice(frases_titulo)
-    prod = buscar_produto(tema)
-    bot = Bot(token=TOKEN)
-    
-    if prod:
-        preco = f"R$ {prod['price']:.2f}".replace(".", ",") if prod['price'] else "EM OFERTA"
-        legenda = (
-            f"{frase}\n\n"
-            f"🛍️ {prod['title']}\n\n"
-            f"💰 Por apenas {preco}\n"
-            f"📦 Enviamos Rápido | 🏠 Achadinhos do Lar\n\n"
-            f"👉 Garanta com desconto:\n{prod['link']}\n\n"
-            f"⚠️ Estoque limitado!"
-        )
-        try:
-            if prod['thumb']:
-                await bot.send_photo(chat_id=CHANNEL, photo=prod['thumb'], caption=legenda)
-            else:
-                await bot.send_message(chat_id=CHANNEL, text=legenda)
-        except:
-            await bot.send_message(chat_id=CHANNEL, text=legenda)
-    else:
-        texto = f"{frase}\n\n🏠 {tema} em oferta que amamos!\n\n👉 {AFFILIATE_FALLBACK}"
-        await bot.send_message(chat_id=CHANNEL, text=texto)
+titulo = produto["title"]
+preco = produto["price"]
+preco_original = produto.get("original_price", preco * 1.8)
+desconto = int((1 - preco/preco_original)*100) if preco_original else 50
+foto = produto["thumbnail"].replace("-I.jpg", "-O.jpg") # foto em alta
+link_produto = produto["permalink"]
 
-asyncio.run(main())
+# LINK DE AFILIADO MERCADO LIVRE - MODELO OFICIAL
+link_afiliado = f"{link_produto}?matt_tool={SEU_CODIGO_AFILIADO}&matt_word=maonamassa"
+
+mensagem = f"""🏠 ACHADINHOS DO LAR 🏠
+
+✨ {titulo}
+
+💰 De R$ {preco_original:.2f} por R$ {preco:.2f}
+🔥 {desconto}% OFF + Frete FULL Grátis!
+
+👉 {link_afiliado}
+
+✅ Produto com selo FULL - Entrega amanhã
+⭐ + de 1.000 vendidos
+
+⏰ Oferta por tempo limitado!
+#achadinhos #lar #organizacao #mercadolivre
+"""
+
+bot.send_photo(
+    chat_id=CHANNEL_ID,
+    photo=foto,
+    caption=mensagem
+)
+
+print(f"Postado: {titulo}")
