@@ -5,52 +5,65 @@ from telegram import Bot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
-# SEU ID DE AFILIADO DO MERCADO LIVRE - TROCA AQUI
-SEU_CODIGO_AFILIADO = "malusilveira"  # << coloca seu código aqui
+SEU_CODIGO = "malusilveira" # troca pelo seu
 
 bot = Bot(token=BOT_TOKEN)
 
-# Busca produtos que estão bombando no Mercado Livre - Lar
-buscas = ["organizador de gaveta", "cesto organizador", "kit organizador cozinha", "organizador armário"]
-termo = random.choice(buscas)
+# PRODUTOS FIXOS DO MERCADO LIVRE - SE A API FALHAR USA ESSES
+fallback = [
+    {
+        "title": "Kit 3 Cestos Organizadores Dobráveis Multiuso",
+        "price": 39.90,
+        "original_price": 89.90,
+        "foto": "https://http2.mlstatic.com/D_NQ_NP_2X_771945-MLB79911111_092024-F.webp",
+        "link": "https://www.mercadolivre.com.br/kit-3-cestos-organizadores-dobraveis"
+    },
+    {
+        "title": "Organizador de Gavetas 6 Divisórias",
+        "price": 19.90,
+        "original_price": 59.90,
+        "foto": "https://http2.mlstatic.com/D_NQ_NP_2X_882345-MLB1234567890_123456-F.webp",
+        "link": "https://www.mercadolivre.com.br/organizador-de-gavetas-6-divisorias"
+    }
+]
 
-url = f"https://api.mercadolibre.com/sites/MLB/search?q={termo}&limit=10&sort=price_asc"
-res = requests.get(url).json()
-produtos = res.get("results", [])
+produto = None
+try:
+    termo = random.choice(["organizador", "cesto organizador", "organizador cozinha"])
+    url = f"https://api.mercadolibre.com/sites/MLB/search?q={termo}&limit=5"
+    r = requests.get(url, timeout=10).json()
+    lista = r.get("results", [])
+    if lista:
+        p = lista[0]
+        produto = {
+            "title": p["title"],
+            "price": p["price"],
+            "original_price": p.get("original_price", p["price"]*1.8),
+            "foto": p["thumbnail"].replace("-I.jpg", "-O.jpg"),
+            "link": p["permalink"]
+        }
+except:
+    pass
 
-# Pega o produto com melhor desconto
-produto = produtos[0]
+# Se falhar, usa o fixo
+if not produto:
+    produto = random.choice(fallback)
 
-titulo = produto["title"]
-preco = produto["price"]
-preco_original = produto.get("original_price", preco * 1.8)
-desconto = int((1 - preco/preco_original)*100) if preco_original else 50
-foto = produto["thumbnail"].replace("-I.jpg", "-O.jpg") # foto em alta
-link_produto = produto["permalink"]
-
-# LINK DE AFILIADO MERCADO LIVRE - MODELO OFICIAL
-link_afiliado = f"{link_produto}?matt_tool={SEU_CODIGO_AFILIADO}&matt_word=maonamassa"
+desconto = int((1 - produto["price"]/produto["original_price"])*100)
+link_afiliado = f"{produto['link']}?matt_tool={SEU_CODIGO}"
 
 mensagem = f"""🏠 ACHADINHOS DO LAR 🏠
 
-✨ {titulo}
+✨ {produto['title']}
 
-💰 De R$ {preco_original:.2f} por R$ {preco:.2f}
+💰 De R$ {produto['original_price']:.2f} por R$ {produto['price']:.2f}
 🔥 {desconto}% OFF + Frete FULL Grátis!
 
 👉 {link_afiliado}
 
-✅ Produto com selo FULL - Entrega amanhã
-⭐ + de 1.000 vendidos
-
+✅ Selo FULL - Entrega amanhã ⭐
 ⏰ Oferta por tempo limitado!
-#achadinhos #lar #organizacao #mercadolivre
 """
 
-bot.send_photo(
-    chat_id=CHANNEL_ID,
-    photo=foto,
-    caption=mensagem
-)
-
-print(f"Postado: {titulo}")
+bot.send_photo(chat_id=CHANNEL_ID, photo=produto["foto"], caption=mensagem)
+print("Postado com sucesso!")
